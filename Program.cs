@@ -21,7 +21,7 @@ namespace G1_RaspagemWeb
         {
             Console.WriteLine("Iniciando extração em G1.com");
 
-            int minNewsNumber = 30;
+            int minNewsNumber = 20;
 
             IWebDriver driver = new ChromeDriver();
 
@@ -63,6 +63,7 @@ namespace G1_RaspagemWeb
             DataTable dataTable = new DataTable();
             dataTable.Columns.Add("Title");
             dataTable.Columns.Add("Summary");
+            dataTable.Columns.Add("Related Text");
             dataTable.Columns.Add("Link");
 
             // Loop through each 'bstn-hl-wrapper' element
@@ -77,23 +78,38 @@ namespace G1_RaspagemWeb
 
                 titleChapeu = Program.GetElementText("span.feed-post-header-chapeu", wrapperElement);
                 summaryText = Program.GetElementText("a.feed-post-link.gui-color-primary.gui-color-hover", wrapperElement);
-                relatedText = Program.GetElementText("a.gui-color-primary.gui-color-hover.feed-post-body-title.bstn-relatedtext", wrapperElement);
                 link = wrapperElement.FindElement(By.CssSelector("a.feed-post-link.gui-color-primary.gui-color-hover")).GetAttribute("href");
 
+                // Find the element by its selector
+                By selector = By.CssSelector("ul.bstn-relateditems");
+
+                // Output the result
+                if (wrapperElement.FindElements(selector).Count > 0)
+                {
+                    IList<IWebElement> relatedTexts = wrapperElement.FindElements(By.CssSelector("a.gui-color-primary.gui-color-hover.feed-post-body-title.bstn-relatedtext"));
+                    foreach(IWebElement relatedTextEl in relatedTexts)
+                    {
+                        relatedText += relatedTextEl.Text;
+                    }
+
+                }
+
                 // Add data row to the DataTable
-                dataTable.Rows.Add(titleChapeu, summaryText, link);
-
-
+                dataTable.Rows.Add(titleChapeu, summaryText, relatedText, link);
 
                 // Output the extracted values
-                Console.WriteLine("Title: " + summaryText);
-                Console.WriteLine("Summary: " + relatedText);
+                Console.WriteLine("Title: " + titleChapeu);
+                Console.WriteLine("Summary: " + summaryText);
+                Console.WriteLine("Related Text: " + relatedText);
                 Console.WriteLine("Link: " + link);
             }
 
 
             // Define the file path and name
             string excelFilePath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "G1_Noticias.xlsx");
+            if (File.Exists(excelFilePath))
+                File.Delete(excelFilePath);
+
             WriteDataTableToExcel(dataTable, excelFilePath);
 
 
@@ -119,8 +135,8 @@ namespace G1_RaspagemWeb
 
 
             // Wait for a key press before ending the program
-            // Console.WriteLine("Press any key to exit...");
-            // Console.ReadKey();
+            //Console.WriteLine("Press any key to exit...");
+            //Console.ReadKey();
 
             // Quit the WebDriver and release resources
             driver.Quit();
@@ -143,9 +159,7 @@ namespace G1_RaspagemWeb
             // Output the result
             if (webElement.FindElements(selector).Count > 0)
             {
-                // Get header Chapeau
                 IWebElement foundElement = webElement.FindElement(selector);
-                // Get the text value from the 'bstn-hl-title' element
                 elementText = foundElement.Text;
             }
 
@@ -171,14 +185,26 @@ namespace G1_RaspagemWeb
                 Sheet sheet = new Sheet() { Id = spreadsheetDocument.WorkbookPart.GetIdOfPart(worksheetPart), SheetId = 1, Name = "Sheet1" };
                 sheets.Append(sheet);
 
-                // Write the data to the worksheet
                 SheetData sheetData = worksheetPart.Worksheet.GetFirstChild<SheetData>();
+
+                // Add Headers
+                Row headerRow = new DocumentFormat.OpenXml.Spreadsheet.Row();
+                foreach (DataColumn col in dataTable.Columns)
+                {
+                    Cell newCell = new Cell();
+                    newCell.DataType = CellValues.String;
+                    newCell.CellValue = new CellValue(col.ColumnName);
+                    headerRow.AppendChild(newCell);
+                }
+                sheetData.AppendChild(headerRow);
+
+                // Write the data to the worksheet
                 foreach (DataRow row in dataTable.Rows)
                 {
-                    DocumentFormat.OpenXml.Spreadsheet.Row newRow = new DocumentFormat.OpenXml.Spreadsheet.Row();
+                    Row newRow = new Row();
                     foreach (DataColumn col in dataTable.Columns)
                     {
-                        DocumentFormat.OpenXml.Spreadsheet.Cell newCell = new DocumentFormat.OpenXml.Spreadsheet.Cell();
+                        Cell newCell = new DocumentFormat.OpenXml.Spreadsheet.Cell();
                         newCell.DataType = CellValues.String;
                         newCell.CellValue = new CellValue(row[col].ToString());
                         newRow.AppendChild(newCell);
