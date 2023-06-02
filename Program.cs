@@ -1,4 +1,6 @@
 ﻿using System;
+using System.Data;
+using System.IO;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -6,7 +8,9 @@ using System.Threading.Tasks;
 using System.Text.RegularExpressions;
 using OpenQA.Selenium.Chrome;
 using OpenQA.Selenium;
-using System.IO;
+using DocumentFormat.OpenXml;
+using DocumentFormat.OpenXml.Spreadsheet;
+using DocumentFormat.OpenXml.Packaging;
 
 namespace G1_RaspagemWeb
 {
@@ -16,9 +20,6 @@ namespace G1_RaspagemWeb
         static void Main(String[] args)    
         {
             Console.WriteLine("Iniciando extração em G1.com");
-
-            //Asks for user input 
-            Console.WriteLine("test");
 
             IWebDriver driver = new ChromeDriver();
 
@@ -30,6 +31,12 @@ namespace G1_RaspagemWeb
 
             // Find all the child divs with class 'bstn-hl-wrapper'
             IList<IWebElement> wrapperElements = driver.FindElements(By.CssSelector("div.feed-post-body"));
+
+            // Create a DataTable
+            DataTable dataTable = new DataTable();
+            dataTable.Columns.Add("Title");
+            dataTable.Columns.Add("Summary");
+            dataTable.Columns.Add("Link");
 
             // Loop through each 'bstn-hl-wrapper' element
             foreach (IWebElement wrapperElement in wrapperElements)
@@ -46,11 +53,21 @@ namespace G1_RaspagemWeb
                 relatedText = Program.GetElementText("a.gui-color-primary.gui-color-hover.feed-post-body-title.bstn-relatedtext", wrapperElement);
                 link = wrapperElement.FindElement(By.CssSelector("a.feed-post-link.gui-color-primary.gui-color-hover")).GetAttribute("href");
 
+                // Add data row to the DataTable
+                dataTable.Rows.Add(titleChapeu, summaryText, link);
+
+
+
                 // Output the extracted values
                 Console.WriteLine("Title: " + summaryText);
                 Console.WriteLine("Summary: " + relatedText);
                 Console.WriteLine("Link: " + link);
             }
+
+
+            // Define the file path and name
+            string excelFilePath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "data.xlsx");
+            WriteDataTableToExcel(dataTable, excelFilePath);
 
 
             // Extract the text or attribute values from the element
@@ -68,15 +85,15 @@ namespace G1_RaspagemWeb
 
             // Define the file path and name
             string filePath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "page.html");
-
+            
 
             // Save the page source as an HTML file
             File.WriteAllText(filePath, pageSource);
 
 
             // Wait for a key press before ending the program
-            Console.WriteLine("Press any key to exit...");
-            Console.ReadKey();
+            // Console.WriteLine("Press any key to exit...");
+            // Console.ReadKey();
 
             // Quit the WebDriver and release resources
             driver.Quit();
@@ -107,6 +124,41 @@ namespace G1_RaspagemWeb
 
 
             return elementText;
+        }
+
+        public static void WriteDataTableToExcel(DataTable dataTable, string filePath)
+        {
+            // Create a new Excel document
+            using (SpreadsheetDocument spreadsheetDocument = SpreadsheetDocument.Create(filePath, SpreadsheetDocumentType.Workbook))
+            {
+                // Add a new workbook to the document
+                WorkbookPart workbookPart = spreadsheetDocument.AddWorkbookPart();
+                workbookPart.Workbook = new Workbook();
+
+                // Add a new worksheet to the workbook
+                WorksheetPart worksheetPart = workbookPart.AddNewPart<WorksheetPart>();
+                worksheetPart.Worksheet = new Worksheet(new SheetData());
+
+                // Add a new sheet to the workbook
+                Sheets sheets = spreadsheetDocument.WorkbookPart.Workbook.AppendChild<Sheets>(new Sheets());
+                Sheet sheet = new Sheet() { Id = spreadsheetDocument.WorkbookPart.GetIdOfPart(worksheetPart), SheetId = 1, Name = "Sheet1" };
+                sheets.Append(sheet);
+
+                // Write the data to the worksheet
+                SheetData sheetData = worksheetPart.Worksheet.GetFirstChild<SheetData>();
+                foreach (DataRow row in dataTable.Rows)
+                {
+                    DocumentFormat.OpenXml.Spreadsheet.Row newRow = new DocumentFormat.OpenXml.Spreadsheet.Row();
+                    foreach (DataColumn col in dataTable.Columns)
+                    {
+                        DocumentFormat.OpenXml.Spreadsheet.Cell newCell = new DocumentFormat.OpenXml.Spreadsheet.Cell();
+                        newCell.DataType = CellValues.String;
+                        newCell.CellValue = new CellValue(row[col].ToString());
+                        newRow.AppendChild(newCell);
+                    }
+                    sheetData.AppendChild(newRow);
+                }
+            }
         }
 
 
