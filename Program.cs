@@ -21,6 +21,8 @@ namespace G1_RaspagemWeb
         {
             Console.WriteLine("Iniciando extração em G1.com");
 
+            int minNewsNumber = 30;
+
             IWebDriver driver = new ChromeDriver();
 
             driver.Navigate().GoToUrl("https://g1.globo.com/");
@@ -31,6 +33,31 @@ namespace G1_RaspagemWeb
 
             // Find all the child divs with class 'bstn-hl-wrapper'
             IList<IWebElement> wrapperElements = driver.FindElements(By.CssSelector("div.feed-post-body"));
+
+
+            while (wrapperElements.Count < minNewsNumber)
+            {
+                // Scroll down to the bottom of the page
+                IJavaScriptExecutor jsExecutor = (IJavaScriptExecutor)driver;
+                jsExecutor.ExecuteScript("window.scrollTo(0, document.body.scrollHeight);");
+
+                // Click on button to show more news, if there are more news to load
+                // Check if an element with the specified locator exists
+                By locator = By.CssSelector("a.load-more");
+                bool elementExists = driver.FindElements(locator).Count > 0;
+
+                if (elementExists)
+                {
+                    IWebElement loadMore = driver.FindElement(locator);
+                    loadMore.Click();
+                }
+
+                wrapperElements = driver.FindElements(By.CssSelector("div.feed-post-body"));
+
+            }
+
+
+
 
             // Create a DataTable
             DataTable dataTable = new DataTable();
@@ -66,7 +93,7 @@ namespace G1_RaspagemWeb
 
 
             // Define the file path and name
-            string excelFilePath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "data.xlsx");
+            string excelFilePath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "G1_Noticias.xlsx");
             WriteDataTableToExcel(dataTable, excelFilePath);
 
 
@@ -84,7 +111,7 @@ namespace G1_RaspagemWeb
             pageSource = Regex.Replace(pageSource, "<head.*?</head>", string.Empty, RegexOptions.Singleline);
 
             // Define the file path and name
-            string filePath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "page.html");
+            string filePath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "G1.html");
             
 
             // Save the page source as an HTML file
